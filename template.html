@@ -18,10 +18,19 @@
   <style>
     .wine_v_1 {
       margin-bottom: 20px;
+      position: relative; /* Добавляем для позиционирования значка */
     }
     .wine_v_1 img {
-    height: 250px;
-    object-fit: contain;
+      height: 250px;
+      object-fit: contain;
+    }
+    .profitable-badge {
+      width: 10rem;
+      height: 10rem;
+      position: absolute;
+      right: -20px;
+      top: -20px;
+      z-index: 10;
     }
   </style>
 </head>
@@ -104,22 +113,33 @@
           </div>
         </div>
 
-        <div class="row">
-          {% for wine in wines %}
-            <div class="col-lg-4 mb-5 col-md-6">
-              <div class="wine_v_1 text-center pb-4 pt-5">
-                <img src="images/{{ wine['Картинка'] }}" alt="{{ wine['Название'] }}" class="img-fluid">
-                <div>
-                  <h3 class="heading mt-3 mb-3 text-dark">{{ wine['Название'] }}</h3>
-                  <p>
-                    Сорт винограда — {{ wine['Сорт'] }}<br/>
-                    <span class="price">{{ wine['Цена'] }} ₽</span>
-                  </p>
+        {% for category, wines_in_group in wines.items() %}
+          <h3 class="text-center mt-5 mb-4">{{ category }}</h3>
+          <div class="row">
+            {% for wine in wines_in_group %}
+              <div class="col-lg-4 mb-5 col-md-6">
+                <div class="wine_v_1 text-center pb-4 pt-5">
+                  <img src="images/{{ wine['Картинка'] }}" alt="{{ wine['Название'] }}" class="img-fluid">
+                  
+                  {# Значок "Выгодное предложение" - показываем только если есть акция #}
+                  {% if wine['Акция'] %}
+                  <img src="assets/profitable.png" class="profitable-badge" alt="Выгодное предложение">
+                  {% endif %}
+                  
+                  <div>
+                    <h3 class="heading mt-3 mb-3 text-dark">{{ wine['Название'] }}</h3>
+                    <p>
+                      {% if wine['Сорт'] %}  {# Показываем сорт только если он есть #}
+                      Сорт винограда — {{ wine['Сорт'] }}<br/>
+                      {% endif %}
+                      <span class="price">{{ wine['Цена'] }} ₽</span>
+                    </p>
+                  </div>
                 </div>
               </div>
-            </div>
-          {% endfor %}
-        </div>
+            {% endfor %}
+          </div>
+        {% endfor %}
 
       </div>
     </div>
