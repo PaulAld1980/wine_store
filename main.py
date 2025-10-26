@@ -1,20 +1,15 @@
 from collections import defaultdict
 from datetime import datetime
 import json
-from pprint import pprint
 from jinja2 import Environment, FileSystemLoader
 import pandas as pd
+import argparse
+import os
 
 
 def get_year_word(age):
     """
     Возвращает правильное склонение слова 'год' для настоящего времени.
-
-    Args:
-        age (int): Возраст в годах
-
-    Returns:
-        str: 'год', 'года' или 'лет'
     """
     last_two_digits = age % 100
     if 11 <= last_two_digits <= 19:
@@ -28,28 +23,9 @@ def get_year_word(age):
         return 'лет'
 
 
-def clean_data(value):
-    """
-    Заменяет NaN значения на пустые строки.
-
-    Args:
-        value: Любое значение, возможно NaN
-
-    Returns:
-        Оригинальное значение или пустая строка если значение NaN
-    """
-    return value if pd.notna(value) else ''
-
-
 def find_cheapest_wine(wines_data):
     """
     Находит самое дешёвое вино среди всех.
-
-    Args:
-        wines_data (list): Список словарей с данными о винах
-
-    Returns:
-        dict or None: Данные самого дешёвого вина или None если не найдено
     """
     valid_wines = [
         wine for wine in wines_data
@@ -65,13 +41,6 @@ def find_cheapest_wine(wines_data):
 def process_wine_data(wine_data, cheapest_wine):
     """
     Обрабатывает данные одного вина и определяет, является ли оно самым дешёвым.
-
-    Args:
-        wine_data (dict): Данные вина из Excel
-        cheapest_wine (dict): Данные самого дешёвого вина
-
-    Returns:
-        dict: Обработанные данные вина
     """
     is_cheapest = (
         wine_data.get('Название') == cheapest_wine.get('Название') and
@@ -79,10 +48,10 @@ def process_wine_data(wine_data, cheapest_wine):
     )
 
     return {
-        'Название': clean_data(wine_data.get('Название', '')),
-        'Сорт': clean_data(wine_data.get('Сорт', '')),
+        'Название': wine_data.get('Название', '') if pd.notna(wine_data.get('Название')) else '',
+        'Сорт': wine_data.get('Сорт', '') if pd.notna(wine_data.get('Сорт')) else '',
         'Цена': wine_data.get('Цена') if pd.notna(wine_data.get('Цена')) else None,
-        'Картинка': clean_data(wine_data.get('Картинка', '')),
+        'Картинка': wine_data.get('Картинка', '') if pd.notna(wine_data.get('Картинка')) else '',
         'Акция': is_cheapest
     }
 
@@ -90,37 +59,24 @@ def process_wine_data(wine_data, cheapest_wine):
 def load_wine_data_from_excel(file_path):
     """
     Загружает данные о винах из Excel файла.
-
-    Args:
-        file_path (str): Путь к Excel файлу
-
-    Returns:
-        list: Список словарей с данными о винах
     """
-    try:
-        excel_data = pd.read_excel(file_path, na_values='', keep_default_na=False)
-        return excel_data.to_dict(orient='records')
-    except FileNotFoundError:
-        raise FileNotFoundError(f"Файл {file_path} не найден!")
-    except Exception as e:
-        raise Exception(f"Ошибка при чтении Excel-файла: {e}")
+    excel_data = pd.read_excel(file_path, na_values='', keep_default_na=False)
+    return excel_data.to_dict(orient='records')
 
 
 def group_wines_by_category(wines_data, cheapest_wine):
     """
     Группирует вина по категориям.
-
-    Args:
-        wines_data (list): Список словарей с данными о винах
-        cheapest_wine (dict): Данные самого дешёвого вина
-
-    Returns:
-        dict: Словарь с винами, сгруппированными по категориям
     """
     grouped_wines = defaultdict(list)
 
     for wine in wines_data:
-        category = clean_data(wine.get('Категория', '')).strip()
+        category = wine.get('Категория', '')
+        if pd.notna(category):
+            category = category.strip()
+        else:
+            category = ''
+
         if not category:
             continue
 
@@ -133,106 +89,89 @@ def group_wines_by_category(wines_data, cheapest_wine):
 def save_data_to_json(data, file_path):
     """
     Сохраняет данные в JSON файл.
-
-    Args:
-        data: Данные для сохранения
-        file_path (str): Путь к файлу для сохранения
     """
-    try:
-        with open(file_path, 'w', encoding='utf-8') as file:
-            json.dump(data, file, ensure_ascii=False, indent=2)
-    except Exception as e:
-        raise Exception(f"Ошибка при сохранении JSON: {e}")
+    with open(file_path, 'w', encoding='utf-8') as file:
+        json.dump(data, file, ensure_ascii=False, indent=2)
 
 
 def generate_html_page(wines_data, age, output_path='index.html'):
     """
     Генерирует HTML страницу на основе данных о винах.
-
-    Args:
-        wines_data (dict): Сгруппированные данные о винах
-        age (int): Возраст винодельни
-        output_path (str): Путь для сохранения HTML файла
     """
-    try:
-        env = Environment(loader=FileSystemLoader('.'))
-        template = env.get_template('template.html')
+    env = Environment(loader=FileSystemLoader('.'))
+    template = env.get_template('template.html')
 
-        rendered_page = template.render(
-            age=age,
-            get_year_word=get_year_word,
-            wines=wines_data
-        )
+    rendered_page = template.render(
+        age=age,
+        get_year_word=get_year_word,
+        wines=wines_data
+    )
 
-        with open(output_path, 'w', encoding='utf-8') as file:
-            file.write(rendered_page)
-    except Exception as e:
-        raise Exception(f"Ошибка при генерации HTML: {e}")
+    with open(output_path, 'w', encoding='utf-8') as file:
+        file.write(rendered_page)
 
 
-def print_statistics(wines_data):
+def parse_arguments():
     """
-    Выводит статистику по винам в консоль.
-
-    Args:
-        wines_data (dict): Сгруппированные данные о винах
+    Парсит аргументы командной строки и переменные окружения.
     """
-    print("\n=== СТАТИСТИКА ===")
-    total_wines = 0
-    total_actions = 0
+    parser = argparse.ArgumentParser(
+        description='Генератор сайта-магазина вин из Excel файла'
+    )
 
-    for category, wines_in_category in wines_data.items():
-        category_actions = sum(1 for wine in wines_in_category if wine['Акция'])
-        print(f"Категория '{category}': {len(wines_in_category)} вин (акций: {category_actions})")
-        total_wines += len(wines_in_category)
-        total_actions += category_actions
+    parser.add_argument(
+        '--excel-file',
+        default=os.getenv('WINE_EXCEL_FILE', 'wine3.xlsx'),
+        help='Путь к Excel файлу с данными о винах'
+    )
+    parser.add_argument(
+        '--html-output',
+        default=os.getenv('WINE_HTML_OUTPUT', 'index.html'),
+        help='Путь для сохранения HTML файла'
+    )
+    parser.add_argument(
+        '--template',
+        default=os.getenv('WINE_TEMPLATE', 'template.html'),
+        help='Путь к HTML шаблону'
+    )
+    parser.add_argument(
+        '--save-json',
+        action='store_true',
+        default=os.getenv('WINE_SAVE_JSON', '').lower() in ('true', '1', 'yes'),
+        help='Сохранять данные в JSON файл'
+    )
+    parser.add_argument(
+        '--json-output',
+        default=os.getenv('WINE_JSON_OUTPUT', 'wine_data.json'),
+        help='Путь для сохранения JSON файла'
+    )
 
-    print(f"Всего вин: {total_wines}")
-    print(f"Всего категорий: {len(wines_data)}")
-    print(f"Всего акционных товаров: {total_actions}")
+    return parser.parse_args()
 
 
 def main():
     """
     Основная функция программы.
     """
+    args = parse_arguments()
 
-    EXCEL_FILE_PATH = 'wine3.xlsx'
-    JSON_OUTPUT_PATH = 'wine3.json'
-    HTML_OUTPUT_PATH = 'index.html'
+    EXCEL_FILE_PATH = args.excel_file
+    HTML_OUTPUT_PATH = args.html_output
+    SAVE_JSON = args.save_json
+    JSON_OUTPUT_PATH = args.json_output
     FOUNDATION_YEAR = 1920
 
-    try:
-        current_year = datetime.now().year
-        winery_age = current_year - FOUNDATION_YEAR
+    current_year = datetime.now().year
+    winery_age = current_year - FOUNDATION_YEAR
 
-        print("Загрузка данных о винах...")
-        wines_list = load_wine_data_from_excel(EXCEL_FILE_PATH)
-        print(f"Успешно загружено {len(wines_list)} вин из {EXCEL_FILE_PATH}")
+    wines_list = load_wine_data_from_excel(EXCEL_FILE_PATH)
+    cheapest_wine = find_cheapest_wine(wines_list)
+    grouped_wines = group_wines_by_category(wines_list, cheapest_wine or {})
 
-        cheapest_wine = find_cheapest_wine(wines_list)
-        if cheapest_wine:
-            print(f"Самое дешёвое вино: '{cheapest_wine['Название']}' за {cheapest_wine['Цена']} ₽")
-        else:
-            print("Не удалось найти самое дешёвое вино")
-            cheapest_wine = {}
-
-        grouped_wines = group_wines_by_category(wines_list, cheapest_wine)
-        print_statistics(grouped_wines)
-
-        print(f"\nСохранение данных в {JSON_OUTPUT_PATH}...")
+    if SAVE_JSON:
         save_data_to_json(grouped_wines, JSON_OUTPUT_PATH)
-        print("Данные успешно сохранены")
-        print(f"Генерация HTML страницы {HTML_OUTPUT_PATH}...")
-        generate_html_page(grouped_wines, winery_age, HTML_OUTPUT_PATH)
-        print("HTML-страница успешно создана")
-        print("\n✅ Программа завершена успешно!")
 
-    except Exception as e:
-        print(f"\n❌ Ошибка: {e}")
-        return 1
-
-    return 0
+    generate_html_page(grouped_wines, winery_age, HTML_OUTPUT_PATH)
 
 
 if __name__ == '__main__':
