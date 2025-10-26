@@ -1,3 +1,8 @@
+# IDE
+.idea/
+*.swp
+*.swo
+
 # Python
 __pycache__/
 *.py[cod]
@@ -13,37 +18,33 @@ eggs/
 lib/
 lib64/
 parts/
-sitemedia/
+sdist/
 var/
 wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+MANIFEST
 
 # Virtual environments
 venv/
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
+env/
+ENV/
 
 # OS
 .DS_Store
 Thumbs.db
 
-# Project specific
-index.html
-wine3.json
-main copy.py
-
-# Excel backup files
-~$*
-
-# Logs
-*.log
-
 # Temporary files
 *.tmp
 *.temp
+
+# Backups
+*.bak
+*.backup
+
+# Jupyter
+.ipynb_checkpoints
+
+# Replit
+.replit
