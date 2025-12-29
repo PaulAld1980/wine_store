@@ -4,7 +4,10 @@ import json
 from jinja2 import Environment, FileSystemLoader
 import pandas as pd
 import argparse
-import os
+from http.server import HTTPServer, SimpleHTTPRequestHandler
+
+
+FOUNDATION_YEAR = 1920
 
 
 def get_year_word(age):
@@ -40,18 +43,24 @@ def find_cheapest_wine(wines_data):
 
 def process_wine_data(wine_data, cheapest_wine):
     """
-    Обрабатывает данные одного вина и определяет, является ли оно самым дешёвым.
+    Обрабатывает данные одного вина и определяет,
+    является ли оно самым дешёвым.
     """
     is_cheapest = (
         wine_data.get('Название') == cheapest_wine.get('Название') and
         wine_data.get('Цена') == cheapest_wine.get('Цена')
     )
 
+    название = wine_data.get('Название', '')
+    сорт = wine_data.get('Сорт', '')
+    цена = wine_data.get('Цена')
+    картинка = wine_data.get('Картинка', '')
+
     return {
-        'Название': wine_data.get('Название', '') if pd.notna(wine_data.get('Название')) else '',
-        'Сорт': wine_data.get('Сорт', '') if pd.notna(wine_data.get('Сорт')) else '',
-        'Цена': wine_data.get('Цена') if pd.notna(wine_data.get('Цена')) else None,
-        'Картинка': wine_data.get('Картинка', '') if pd.notna(wine_data.get('Картинка')) else '',
+        'Название': название if pd.notna(название) else '',
+        'Сорт': сорт if pd.notna(сорт) else '',
+        'Цена': цена if pd.notna(цена) else None,
+        'Картинка': картинка if pd.notna(картинка) else '',
         'Акция': is_cheapest
     }
 
@@ -60,7 +69,11 @@ def load_wine_data_from_excel(file_path):
     """
     Загружает данные о винах из Excel файла.
     """
-    excel_data = pd.read_excel(file_path, na_values='', keep_default_na=False)
+    excel_data = pd.read_excel(
+        file_path,
+        na_values='',
+        keep_default_na=False
+    )
     return excel_data.to_dict(orient='records')
 
 
@@ -113,7 +126,7 @@ def generate_html_page(wines_data, age, output_path='index.html'):
 
 def parse_arguments():
     """
-    Парсит аргументы командной строки и переменные окружения.
+    Парсит аргументы командной строки.
     """
     parser = argparse.ArgumentParser(
         description='Генератор сайта-магазина вин из Excel файла'
@@ -121,28 +134,22 @@ def parse_arguments():
 
     parser.add_argument(
         '--excel-file',
-        default=os.getenv('WINE_EXCEL_FILE', 'wine3.xlsx'),
+        default='wine3.xlsx',
         help='Путь к Excel файлу с данными о винах'
     )
     parser.add_argument(
         '--html-output',
-        default=os.getenv('WINE_HTML_OUTPUT', 'index.html'),
+        default='index.html',
         help='Путь для сохранения HTML файла'
-    )
-    parser.add_argument(
-        '--template',
-        default=os.getenv('WINE_TEMPLATE', 'template.html'),
-        help='Путь к HTML шаблону'
     )
     parser.add_argument(
         '--save-json',
         action='store_true',
-        default=os.getenv('WINE_SAVE_JSON', '').lower() in ('true', '1', 'yes'),
         help='Сохранять данные в JSON файл'
     )
     parser.add_argument(
         '--json-output',
-        default=os.getenv('WINE_JSON_OUTPUT', 'wine_data.json'),
+        default='wine_data.json',
         help='Путь для сохранения JSON файла'
     )
 
@@ -155,23 +162,26 @@ def main():
     """
     args = parse_arguments()
 
-    EXCEL_FILE_PATH = args.excel_file
-    HTML_OUTPUT_PATH = args.html_output
-    SAVE_JSON = args.save_json
-    JSON_OUTPUT_PATH = args.json_output
-    FOUNDATION_YEAR = 1920
-
     current_year = datetime.now().year
     winery_age = current_year - FOUNDATION_YEAR
 
-    wines_list = load_wine_data_from_excel(EXCEL_FILE_PATH)
+    wines_list = load_wine_data_from_excel(args.excel_file)
     cheapest_wine = find_cheapest_wine(wines_list)
-    grouped_wines = group_wines_by_category(wines_list, cheapest_wine or {})
+    grouped_wines = group_wines_by_category(
+        wines_list,
+        cheapest_wine or {}
+    )
 
-    if SAVE_JSON:
-        save_data_to_json(grouped_wines, JSON_OUTPUT_PATH)
+    if args.save_json:
+        save_data_to_json(grouped_wines, args.json_output)
 
-    generate_html_page(grouped_wines, winery_age, HTML_OUTPUT_PATH)
+    generate_html_page(grouped_wines, winery_age, args.html_output)
+
+    print(f"HTML файл создан: {args.html_output}")
+    print("Запуск веб-сервера на http://127.0.0.1:8000")
+
+    server = HTTPServer(('127.0.0.1', 8000), SimpleHTTPRequestHandler)
+    server.serve_forever()
 
 
 if __name__ == '__main__':
