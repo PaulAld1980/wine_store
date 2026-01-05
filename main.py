@@ -7,6 +7,7 @@ import argparse
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 
 
+# Глобальная константа - она никогда не меняется
 FOUNDATION_YEAR = 1920
 
 
@@ -51,16 +52,16 @@ def process_wine_data(wine_data, cheapest_wine):
         wine_data.get('Цена') == cheapest_wine.get('Цена')
     )
 
-    название = wine_data.get('Название', '')
-    сорт = wine_data.get('Сорт', '')
-    цена = wine_data.get('Цена')
-    картинка = wine_data.get('Картинка', '')
+    title = wine_data.get('Название', '')
+    grape = wine_data.get('Сорт', '')
+    price = wine_data.get('Цена')
+    image = wine_data.get('Картинка', '')
 
     return {
-        'Название': название if pd.notna(название) else '',
-        'Сорт': сорт if pd.notna(сорт) else '',
-        'Цена': цена if pd.notna(цена) else None,
-        'Картинка': картинка if pd.notna(картинка) else '',
+        'Название': title if pd.notna(title) else '',
+        'Сорт': grape if pd.notna(grape) else '',
+        'Цена': price if pd.notna(price) else None,
+        'Картинка': image if pd.notna(image) else '',
         'Акция': is_cheapest
     }
 
@@ -96,7 +97,7 @@ def group_wines_by_category(wines_data, cheapest_wine):
         processed_wine = process_wine_data(wine, cheapest_wine)
         grouped_wines[category].append(processed_wine)
 
-    return dict(grouped_wines)
+    return grouped_wines
 
 
 def save_data_to_json(data, file_path):
